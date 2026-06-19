@@ -69,20 +69,44 @@ def extract_stage(handoff_path):
 
 
 def recent_lessons(limit=5):
-    """Read last N lessons from ~/.claude/lessons.md."""
-    lessons_path = Path.home() / ".claude" / "lessons.md"
-    if not lessons_path.exists():
-        return ""
+    """Read L3-always lessons (always injected) + recent L2 lessons.
 
-    try:
-        text = lessons_path.read_text(encoding="utf-8")
-        lines = text.strip().split("\n")
-        # Return last ~30 lines (approximately 5 lessons)
-        if len(lines) > 30:
-            return "\n".join(lines[-30:])
-        return text
-    except Exception:
-        return ""
+    Lesson directory structure:
+      ~/.claude/lessons/
+        L3-always/   ← always injected (core behavioral rules)
+        L2-tagged/   ← injected when context matches tags
+        L1-archived/ ← never auto-injected (historical)
+    """
+    lessons_dir = Path.home() / ".claude" / "lessons"
+
+    parts = []
+
+    # L3-always: inject all (these are core rules, ≤5 files by convention)
+    l3_dir = lessons_dir / "L3-always"
+    if l3_dir.is_dir():
+        for f in sorted(l3_dir.glob("*.md")):
+            try:
+                content = f.read_text(encoding="utf-8").strip()
+                if content:
+                    parts.append(content)
+            except Exception:
+                pass
+
+    # L2-tagged: inject only recent 2 (too many = context bloat)
+    l2_dir = lessons_dir / "L2-tagged"
+    if l2_dir.is_dir():
+        l2_files = sorted(l2_dir.glob("*.md"), key=lambda p: p.name, reverse=True)
+        for f in l2_files[:2]:
+            try:
+                content = f.read_text(encoding="utf-8").strip()
+                if content:
+                    parts.append(content)
+            except Exception:
+                pass
+
+    if parts:
+        return "=== 最近教训 (SessionStart 自动注入) ===\n\n" + "\n\n---\n\n".join(parts)
+    return ""
 
 
 def main():
@@ -120,6 +144,27 @@ def main():
                 }
             }
             print(json.dumps(output, ensure_ascii=False))
+
+        # ── Sync check (after output, as stderr info) ──
+        # Check if deployed agents are older than source (agency-v2 repo)
+        src_agents = Path(__file__).resolve().parent.parent.parent.parent / "agents"
+        deployed_agents = Path.home() / ".claude" / "agents"
+        if src_agents.is_dir() and deployed_agents.is_dir():
+            try:
+                src_newest = max(f.stat().st_mtime for f in src_agents.glob("*.md"))
+                deployed_newest = max(f.stat().st_mtime for f in deployed_agents.glob("*.md"))
+                if src_newest > deployed_newest + 60:  # >1 min newer = source updated
+                    reminder = (
+                        "[Agency] agents/skills 有更新。运行 bash install.sh --sync 同步。"
+                    )
+                    print(json.dumps({
+                        "hookSpecificOutput": {
+                            "hookEventName": "SessionStart",
+                            "additionalContext": reminder,
+                        }
+                    }, ensure_ascii=False))
+            except Exception:
+                pass
 
     except Exception:
         # Never block session start
