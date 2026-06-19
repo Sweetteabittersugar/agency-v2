@@ -78,6 +78,24 @@ conn.close()
 "
 echo "  ✓ Database ready at $AGENCY_DIR/agency.db"
 
+# ── Step 4: Add Agency reference to global CLAUDE.md ──
+GLOBAL_CLAUDE="$HOME/.claude/CLAUDE.md"
+AGENCY_HINT="<!-- AGENCY-V2 --> Agency v2 已安装。可用命令: /cost(费用) /history(记录) /help(说明) @agent名(路由)。运行 python -m agency.check 诊断。"
+
+if [ -f "$GLOBAL_CLAUDE" ]; then
+    if ! grep -q "AGENCY-V2" "$GLOBAL_CLAUDE" 2>/dev/null; then
+        echo "" >> "$GLOBAL_CLAUDE"
+        echo "$AGENCY_HINT" >> "$GLOBAL_CLAUDE"
+        echo "  ✓ Agency reference added to ~/.claude/CLAUDE.md"
+    else
+        echo "  • Already in ~/.claude/CLAUDE.md (skipping)"
+    fi
+else
+    mkdir -p "$(dirname "$GLOBAL_CLAUDE")"
+    echo "$AGENCY_HINT" > "$GLOBAL_CLAUDE"
+    echo "  ✓ Created ~/.claude/CLAUDE.md"
+fi
+
 # ── Done ──
 echo ""
 echo "══════════════════════════════════════"
