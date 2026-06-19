@@ -59,6 +59,30 @@ with open('$SETTINGS_FILE', 'w') as f:
     else
         echo "  • Stop hook already registered (skipping)"
     fi
+
+    # SessionStart hook (model reminder + lessons injection)
+    if python3 -c "
+import json
+with open('$SETTINGS_FILE') as f:
+    s = json.load(f)
+start_hooks = s.get('hooks', {}).get('SessionStart', [])
+found = any('agency.hooks.session_start' in str(h) for h in start_hooks)
+exit(1 if found else 0)
+" 2>/dev/null; then
+        python3 -c "
+import json
+with open('$SETTINGS_FILE') as f:
+    s = json.load(f)
+hooks = s.setdefault('hooks', {})
+start_hooks = hooks.setdefault('SessionStart', [])
+start_hooks.append({'command': 'python -m agency.hooks.session_start'})
+with open('$SETTINGS_FILE', 'w') as f:
+    json.dump(s, f, indent=2)
+"
+        echo "  ✓ SessionStart hook registered"
+    else
+        echo "  • SessionStart hook already registered (skipping)"
+    fi
 else
     # Create new settings.json
     mkdir -p "\$(dirname \"$SETTINGS_FILE\")"
