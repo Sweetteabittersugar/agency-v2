@@ -12,6 +12,25 @@ import shutil
 from pathlib import Path
 
 
+def check_node():
+    """Node.js ≥ 18 (required by Claude Code)."""
+    ok = shutil.which("node") is not None
+    detail = ""
+    if ok:
+        import subprocess
+        try:
+            r = subprocess.run(["node", "--version"], capture_output=True, text=True, timeout=5)
+            detail = r.stdout.strip()
+        except Exception:
+            detail = "已安装"
+    return {
+        "name": "Node.js",
+        "ok": ok,
+        "detail": detail or "未安装",
+        "fix": "Claude Code 需要 Node.js ≥ 18，请安装 https://nodejs.org" if not ok else "",
+    }
+
+
 def check_python():
     """Python version ≥ 3.8."""
     v = sys.version_info
@@ -155,6 +174,7 @@ def check_all():
     return [
         check_python(),
         check_pip(),
+        check_node(),
         check_claude_code(),
         check_cc_switch(),
         check_deepseek_key(),
@@ -187,6 +207,16 @@ def format_text(results):
         lines.append("✅ 全部通过")
     else:
         lines.append(f"⚠️  {ok_count}/{total} 项通过，{total - ok_count} 项需处理")
+
+    # Feature summary — always show
+    lines.append("")
+    lines.append("📦 已安装功能：")
+    lines.append("  /cost      费用追踪（自动，会话结束后可查）")
+    lines.append("  /history   Agent 执行记录")
+    lines.append("  /help      内置说明书")
+    lines.append("  @agent名   9 个 Agent 自动路由")
+    lines.append("")
+    lines.append("💡 在 Claude Code 里输入 /help 开始探索")
     return "\n".join(lines)
 
 
